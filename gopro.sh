@@ -1,4 +1,4 @@
-trap cleanup TERM INT
+trap cleanup TERM INT ERR
 cleanup() {
     curl -s ${mangled_ip}"/gp/gpWebcam/STOP"
     echo "sent STOP to GoPro"
@@ -8,7 +8,7 @@ cleanup() {
  }
 
 # create video loopback device
-sudo modprobe v4l2loopback exclusive_caps=1 card_label='GoproLinux' video_nr=42
+sudo modprobe v4l2loopback exclusive_caps=1 card_label='GoPro' video_nr=42
 echo "created video loopback device /dev/video42"
 
 # find the most recently attached cdc_ether
@@ -27,4 +27,12 @@ fi
 echo "sent GoPro the START command"
 
 echo "Starting stream CTRL + C to disable webcam"
-ffmpeg -nostdin -threads 1 -i 'udp://@0.0.0.0:8554?overrun_nonfatal=1&fifo_size=50000000' -f:v mpegts -fflags nobuffer -vf format=yuv420p -f v4l2 /dev/video42 >/dev/null 2>&1
+
+if [[ $1 == '-c' ]]; then
+    echo "Stream will be cropped to 720p in the middle"
+    # crop to 720p from center
+    ffmpeg -nostdin -threads 1 -i 'udp://@0.0.0.0:8554?overrun_nonfatal=1&fifo_size=50000000' -f:v mpegts -fflags nobuffer -vf 'format=yuv420p,crop=1280:720' -f v4l2 /dev/video42 >/dev/null 2>&1
+else
+    # no crop
+    ffmpeg -nostdin -threads 1 -i 'udp://@0.0.0.0:8554?overrun_nonfatal=1&fifo_size=50000000' -f:v mpegts -fflags nobuffer -vf format=yuv420p -f v4l2 /dev/video42 >/dev/null 2>&1
+fi
